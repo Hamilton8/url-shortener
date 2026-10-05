@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>URL Shortener</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--line:#ddd;--acc:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#15171a;--fg:#eee;--mut:#9aa;--line:#333;--acc:#60a5fa}}
+body{font:16px system-ui,sans-serif;background:var(--bg);color:var(--fg);max-width:860px;margin:2rem auto;padding:0 1rem}
+form{display:flex;gap:.5rem;flex-wrap:wrap}input{flex:1;min-width:220px;padding:.6rem;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit}
+button{padding:.6rem 1rem;border:0;border-radius:6px;background:var(--acc);color:#fff;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:1.5rem}th,td{text-align:left;padding:.5rem;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+tr.row{cursor:pointer}.mut{color:var(--mut)}.bar{background:var(--acc);height:14px;border-radius:3px}
+.day{display:grid;grid-template-columns:100px 1fr 40px;gap:.5rem;align-items:center;margin:.25rem 0}#msg{color:#dc2626}
+</style></head><body>
+<h1>URL Shortener</h1>
+<form id="f"><input id="u" placeholder="https://example.com/a/very/long/link" required><button>Shorten</button></form>
+<p id="msg"></p>
+<table><thead><tr><th>Short</th><th>Destination</th><th>Clicks</th></tr></thead><tbody id="t"></tbody></table>
+<div id="stats"></div>
+<script>
+const $=id=>document.getElementById(id);
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function load(){
+  const d=await (await fetch('/api/urls')).json();
+  $('t').innerHTML=d.map(x=>`<tr class="row" data-c="${x.shortCode}"><td><a href="/${x.shortCode}" target="_blank">${x.shortCode}</a></td><td class="mut">${esc(x.longUrl)}</td><td>${x.clicks}</td></tr>`).join('');
+}
+$('f').onsubmit=async e=>{e.preventDefault();$('msg').textContent='';
+  const r=await fetch('/api/urls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('u').value})});
+  if(!r.ok){$('msg').textContent=(await r.json()).message||'Error';return}
+  $('u').value='';load()};
+$('t').onclick=async e=>{const tr=e.target.closest('tr.row');if(!tr||e.target.tagName==='A')return;
+  const s=await (await fetch(`/api/urls/${tr.dataset.c}/stats`)).json();
+  const max=Math.max(1,...Object.values(s.clicksByDay));
+  $('stats').innerHTML=`<h2>${s.shortCode}: ${s.totalClicks} clicks</h2>`+(Object.entries(s.clicksByDay).map(([d,n])=>`<div class="day"><span>${d}</span><div class="bar" style="width:${n/max*100}%"></div><span>${n}</span></div>`).join('')||'<p class="mut">No clicks yet.</p>')};
+load();
+</script></body></html>
